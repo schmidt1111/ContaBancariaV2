@@ -110,6 +110,13 @@ class Conta:
 
         return True
 
+    def transferir(self, destino, valor):
+        if self.sacar(valor):
+            destino.depositar(valor)
+            print("\n=== Transferência realizada com sucesso! ===")
+            return True
+        return False
+
 
 class ContaCorrente(Conta):
     def __init__(self, numero, cliente, limite=500, limite_saques=3):
@@ -221,6 +228,27 @@ class Deposito(Transacao):
             conta.historico.adicionar_transacao(self)
 
 
+class Transferencia(Transacao):
+    def __init__(self, valor, conta_destino):
+        self._valor = valor
+        self._conta_destino = conta_destino
+
+    @property
+    def valor(self):
+        return self._valor
+
+    @property
+    def conta_destino(self):
+        return self._conta_destino
+
+    def registrar(self, conta):
+        sucesso_transacao = conta.transferir(self._conta_destino, self.valor)
+
+        if sucesso_transacao:
+            conta.historico.adicionar_transacao(self)
+            self._conta_destino.historico.adicionar_transacao(self)
+
+
 def log_transacao(func):
     def envelope(*args, **kwargs):
         resultado = func(*args, **kwargs)
@@ -239,6 +267,8 @@ def menu():
     [nc]\tNova conta
     [lc]\tListar contas
     [nu]\tNovo usuário
+    [tu]\tTransferência
+    [uc]\tAtualizar Cliente
     [q]\tSair
     => """
 
@@ -368,6 +398,58 @@ def listar_contas(contas):
         print(textwrap.dedent(str(conta)))
 
 
+@log_transacao
+def atualizar_cliente(clientes):
+    cpf = input("Informe o CPF do cliente: ")
+    cliente = filtrar_cliente(cpf, clientes)
+
+    if not cliente:
+        print("\n@@@ Cliente não encontrado! @@@")
+        return
+
+    print("\n=== Atualizar dados do cliente ===")
+    nome = input(f"Informe o novo nome (atual: {cliente.nome}): ")
+    data_nascimento = input(f"Informe a nova data de nascimento (atual: {cliente.data_nascimento}): ")
+    endereco = input(f"Informe o novo endereço (atual: {cliente.endereco}): ")
+
+    if nome:
+        cliente.nome = nome
+    if data_nascimento:
+        cliente.data_nascimento = data_nascimento
+    if endereco:
+        cliente.endereco = endereco
+
+    print("\n=== Dados do cliente atualizados com sucesso! ===")
+
+
+@log_transacao
+def transferir(clientes):
+    cpf_origem = input("Informe o CPF do cliente de origem: ")
+    cliente_origem = filtrar_cliente(cpf_origem, clientes)
+
+    if not cliente_origem:
+        print("\n@@@ Cliente de origem não encontrado! @@@")
+        return
+
+    cpf_destino = input("Informe o CPF do cliente de destino: ")
+    cliente_destino = filtrar_cliente(cpf_destino, clientes)
+
+    if not cliente_destino:
+        print("\n@@@ Cliente de destino não encontrado! @@@")
+        return
+
+    valor = float(input("Informe o valor da transferência: "))
+
+    conta_origem = recuperar_conta_cliente(cliente_origem)
+    conta_destino = recuperar_conta_cliente(cliente_destino)
+
+    if not conta_origem or not conta_destino:
+        return
+
+    transacao = Transferencia(valor, conta_destino)
+    cliente_origem.realizar_transacao(conta_origem, transacao)
+
+
 def main():
     clientes = []
     contas = []
@@ -393,6 +475,12 @@ def main():
 
         elif opcao == "lc":
             listar_contas(contas)
+
+        elif opcao == "tu":
+            transferir(clientes)
+
+        elif opcao == "uc":
+            atualizar_cliente(clientes)
 
         elif opcao == "q":
             break
